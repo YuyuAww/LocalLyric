@@ -48,8 +48,15 @@ object EnhanceLrcParser {
     private fun mergeLines(lines: MutableList<RichLyricLine>, cur: RichLyricLine) {
         val last = lines.lastOrNull()
         if (last != null && last.begin == cur.begin) {
-            last.secondary = cur.text
-            last.secondaryWords = cur.words
+            // 第一次同时间戳辅助文本存为 secondary（罗马音）
+            // 第二次同时间戳辅助文本存为 translation（翻译）
+            if (last.secondary == null) {
+                last.secondary = cur.text
+                last.secondaryWords = cur.words
+            } else if (last.translation == null) {
+                last.translation = cur.text
+                last.translationWords = cur.words
+            }
             if (cur.isAlignedRight) last.isAlignedRight = true
         } else {
             lines.add(cur)
