@@ -83,20 +83,18 @@ val generateReleaseKeystore by tasks.registering {
         val alias = System.getenv("RELEASE_KEY_ALIAS") ?: "androidkey"
         val keyPass = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
         val dname = "CN=LocalLyric, OU=Proify, O=Proify, L=Unknown, ST=Unknown, C=CN"
-        exec {
-            commandLine(
-                "keytool", "-genkeypair",
-                "-keystore", keystoreFile.absolutePath,
-                "-storetype", "PKCS12",
-                "-keyalg", "RSA",
-                "-keysize", "2048",
-                "-validity", "10000",
-                "-alias", alias,
-                "-storepass", storePass,
-                "-keypass", keyPass,
-                "-dname", dname
-            )
-        }
+        ProcessBuilder(
+            "keytool", "-genkeypair",
+            "-keystore", keystoreFile.absolutePath,
+            "-storetype", "PKCS12",
+            "-keyalg", "RSA",
+            "-keysize", "2048",
+            "-validity", "10000",
+            "-alias", alias,
+            "-storepass", storePass,
+            "-keypass", keyPass,
+            "-dname", dname
+        ).redirectErrorStream(true).start().waitFor()
     }
 }
 
