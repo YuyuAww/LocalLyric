@@ -40,36 +40,10 @@ configure<ApplicationExtension> {
 
     signingConfigs {
         create("release") {
-            // 默认密钥文件路径（相对于项目根目录）
-            val storeFilePath = System.getenv("RELEASE_STORE_FILE") ?: rootProject.file("release.jks").absolutePath
-            val storePass = System.getenv("RELEASE_STORE_PASSWORD") ?: "android"
-            val alias = System.getenv("RELEASE_KEY_ALIAS") ?: "androidkey"
-            val keyPass = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
-
-            // 密钥文件不存在时自动生成公版测试密钥
-            val keystoreFile = file(storeFilePath)
-            if (!keystoreFile.exists()) {
-                keystoreFile.parentFile?.mkdirs()
-                val dname = "CN=LocalLyric, OU=Proify, O=Proify, L=Unknown, ST=Unknown, C=CN"
-                val cmd = listOf(
-                    "keytool", "-genkeypair",
-                    "-keystore", keystoreFile.absolutePath,
-                    "-storetype", "PKCS12",
-                    "-keyalg", "RSA",
-                    "-keysize", "2048",
-                    "-validity", "10000",
-                    "-alias", alias,
-                    "-storepass", storePass,
-                    "-keypass", keyPass,
-                    "-dname", dname
-                )
-                ProcessBuilder(cmd).redirectErrorStream(true).start().waitFor()
-            }
-
-            storeFile = keystoreFile
-            storePassword = storePass
-            keyAlias = alias
-            keyPassword = keyPass
+            storeFile = file(System.getenv("RELEASE_STORE_FILE") ?: rootProject.file("release.jks").absolutePath)
+            storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: "android"
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "androidkey"
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
         }
     }
 
@@ -96,6 +70,38 @@ configure<ApplicationExtension> {
     buildFeatures {
         buildConfig = true
     }
+}
+
+// 自动生成公版测试密钥（执行阶段，兼容配置缓存）
+val generateReleaseKeystore by tasks.registering {
+    val keystoreFile = file(System.getenv("RELEASE_STORE_FILE") ?: rootProject.file("release.jks").absolutePath)
+    outputs.file(keystoreFile)
+    doLast {
+        if (keystoreFile.exists()) return@doLast
+        keystoreFile.parentFile?.mkdirs()
+        val storePass = System.getenv("RELEASE_STORE_PASSWORD") ?: "android"
+        val alias = System.getenv("RELEASE_KEY_ALIAS") ?: "androidkey"
+        val keyPass = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
+        val dname = "CN=LocalLyric, OU=Proify, O=Proify, L=Unknown, ST=Unknown, C=CN"
+        exec {
+            commandLine(
+                "keytool", "-genkeypair",
+                "-keystore", keystoreFile.absolutePath,
+                "-storetype", "PKCS12",
+                "-keyalg", "RSA",
+                "-keysize", "2048",
+                "-validity", "10000",
+                "-alias", alias,
+                "-storepass", storePass,
+                "-keypass", keyPass,
+                "-dname", dname
+            )
+        }
+    }
+}
+
+tasks.matching { it.name.startsWith("assemble") || it.name.startsWith("validateSigning") }.configureEach {
+    dependsOn(generateReleaseKeystore)
 }
 
 dependencies {
