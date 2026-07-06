@@ -47,13 +47,13 @@ configure<ApplicationExtension> {
             val keyPass = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
 
             // 密钥文件不存在时自动生成公版测试密钥
-            val storeFile = file(storeFilePath)
-            if (!storeFile.exists()) {
-                storeFile.parentFile?.mkdirs()
+            val keystoreFile = file(storeFilePath)
+            if (!keystoreFile.exists()) {
+                keystoreFile.parentFile?.mkdirs()
                 val dname = "CN=LocalLyric, OU=Proify, O=Proify, L=Unknown, ST=Unknown, C=CN"
                 val cmd = listOf(
                     "keytool", "-genkeypair",
-                    "-keystore", storeFile.absolutePath,
+                    "-keystore", keystoreFile.absolutePath,
                     "-storetype", "PKCS12",
                     "-keyalg", "RSA",
                     "-keysize", "2048",
@@ -66,7 +66,7 @@ configure<ApplicationExtension> {
                 ProcessBuilder(cmd).redirectErrorStream(true).start().waitFor()
             }
 
-            storeFile = storeFile
+            storeFile = keystoreFile
             storePassword = storePass
             keyAlias = alias
             keyPassword = keyPass
