@@ -35,3 +35,5 @@ rootProject.name = "LyricProvider"
 
 include(":app")
 include(":share:lrckit")
+include(":share:extensions-kt")
+include(":share:extensions-android")
