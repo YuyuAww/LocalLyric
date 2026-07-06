@@ -152,7 +152,7 @@ object PowerAmp : YukiBaseHooker() {
                         YLog.debug(tag = TAG, msg = "未找到内嵌歌词标签")
                         return@let null
                     }
-                    val raw = entry.value?.firstOrNull() ?: return@let null
+                    val raw = entry.value.firstOrNull() ?: return@let null
                     YLog.info(tag = TAG, msg = "找到内嵌歌词，长度=${raw.length}")
                     YLog.debug(tag = TAG, msg = "内嵌歌词前200字符: ${raw.take(200)}")
 
