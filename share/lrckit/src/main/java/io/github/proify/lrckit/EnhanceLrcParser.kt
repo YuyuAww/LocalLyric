@@ -10,6 +10,14 @@ import io.github.proify.lyricon.lyric.model.LyricWord
 import io.github.proify.lyricon.lyric.model.RichLyricLine
 
 /**
+ * 增强型歌词解析结果。
+ */
+data class EnhanceLrcDocument(
+    val metadata: Map<String, String>,
+    val lines: List<RichLyricLine>
+)
+
+/**
  * 增强型歌词解析器。
  * 支持逐字时间轴、多角色区分、bg语义化合并及内联时间戳格式（如[00:00.715]世[00:00.924]界）。
  */

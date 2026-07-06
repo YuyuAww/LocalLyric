@@ -15,7 +15,7 @@ plugins {
 configure<ApplicationExtension> {
     namespace = "io.github.proify.lyricon.localprovider"
     compileSdk {
-        version = release(36)
+        version = release(37)
     }
 
     defaultConfig {
