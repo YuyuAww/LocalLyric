@@ -40,10 +40,36 @@ configure<ApplicationExtension> {
 
     signingConfigs {
         create("release") {
-            storeFile = file(System.getenv("RELEASE_STORE_FILE") ?: "release.jks")
-            storePassword = System.getenv("RELEASE_STORE_PASSWORD")
-            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
-            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            // 默认密钥文件路径（相对于项目根目录）
+            val storeFilePath = System.getenv("RELEASE_STORE_FILE") ?: rootProject.file("release.jks").absolutePath
+            val storePass = System.getenv("RELEASE_STORE_PASSWORD") ?: "android"
+            val alias = System.getenv("RELEASE_KEY_ALIAS") ?: "androidkey"
+            val keyPass = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
+
+            // 密钥文件不存在时自动生成公版测试密钥
+            val storeFile = file(storeFilePath)
+            if (!storeFile.exists()) {
+                storeFile.parentFile?.mkdirs()
+                val dname = "CN=LocalLyric, OU=Proify, O=Proify, L=Unknown, ST=Unknown, C=CN"
+                val cmd = listOf(
+                    "keytool", "-genkeypair",
+                    "-keystore", storeFile.absolutePath,
+                    "-storetype", "PKCS12",
+                    "-keyalg", "RSA",
+                    "-keysize", "2048",
+                    "-validity", "10000",
+                    "-alias", alias,
+                    "-storepass", storePass,
+                    "-keypass", keyPass,
+                    "-dname", dname
+                )
+                ProcessBuilder(cmd).redirectErrorStream(true).start().waitFor()
+            }
+
+            storeFile = storeFile
+            storePassword = storePass
+            keyAlias = alias
+            keyPassword = keyPass
         }
     }
 

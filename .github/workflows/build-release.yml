@@ -24,24 +24,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Generate signing key
-        run: |
-          keytool -genkey -v \
-            -keystore release.jks \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -alias androidkey \
-            -storepass android \
-            -keypass android \
-            -dname "CN=LocalLyric, OU=Proify, O=Proify, L=Unknown, ST=Unknown, C=CN"
-
       - name: Build release APK
-        env:
-          RELEASE_STORE_FILE: release.jks
-          RELEASE_STORE_PASSWORD: android
-          RELEASE_KEY_ALIAS: androidkey
-          RELEASE_KEY_PASSWORD: android
         run: ./gradlew assembleRelease
 
       - name: Upload APK artifact
