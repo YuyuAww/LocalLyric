@@ -72,36 +72,6 @@ configure<ApplicationExtension> {
     }
 }
 
-// 自动生成公版测试密钥（执行阶段，兼容配置缓存）
-val generateReleaseKeystore by tasks.registering {
-    val keystoreFile = file(System.getenv("RELEASE_STORE_FILE") ?: rootProject.file("release.jks").absolutePath)
-    outputs.file(keystoreFile)
-    doLast {
-        if (keystoreFile.exists()) return@doLast
-        keystoreFile.parentFile?.mkdirs()
-        val storePass = System.getenv("RELEASE_STORE_PASSWORD") ?: "android"
-        val alias = System.getenv("RELEASE_KEY_ALIAS") ?: "androidkey"
-        val keyPass = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
-        val dname = "CN=LocalLyric, OU=Proify, O=Proify, L=Unknown, ST=Unknown, C=CN"
-        ProcessBuilder(
-            "keytool", "-genkeypair",
-            "-keystore", keystoreFile.absolutePath,
-            "-storetype", "PKCS12",
-            "-keyalg", "RSA",
-            "-keysize", "2048",
-            "-validity", "10000",
-            "-alias", alias,
-            "-storepass", storePass,
-            "-keypass", keyPass,
-            "-dname", dname
-        ).redirectErrorStream(true).start().waitFor()
-    }
-}
-
-tasks.matching { it.name.startsWith("assemble") || it.name.startsWith("validateSigning") }.configureEach {
-    dependsOn(generateReleaseKeystore)
-}
-
 dependencies {
     // 共享模块
     implementation(project(":share:lrckit"))
