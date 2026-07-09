@@ -71,7 +71,7 @@ LyricProvider/
 1. **初始化阶段**
    - Xposed 注入目标应用进程
    - 注册 Lyricon Provider 服务
-   - 创建默认歌词目录（Lyrics、Music、Download）
+   - 创建默认歌词目录（Music、Download）
    - Hook MediaSession API 或注册广播接收器（PowerAmp）
 
 2. **歌词搜索流程**
@@ -318,7 +318,6 @@ repositories {
 
 3. **歌词目录**
    默认扫描目录：
-   - `/storage/emulated/0/Lyrics`
    - `/storage/emulated/0/Music`
    - `/storage/emulated/0/Download`
 
@@ -387,6 +386,7 @@ repositories {
 - **协程异步**：所有 I/O 操作使用协程
 - **懒加载**：歌词库按需初始化
 - **任务取消**：歌曲切换时自动取消未完成任务
+- **日志精简**：仅保留关键日志（info/error/warn），减少调试日志输出
 
 ### 4. 特殊播放器支持
 
