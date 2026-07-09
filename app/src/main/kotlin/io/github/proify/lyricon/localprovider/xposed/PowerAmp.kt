@@ -101,8 +101,6 @@ object PowerAmp : YukiBaseHooker() {
         if (id == currentSongId) return
         currentSongId = id
 
-        YLog.debug(tag = TAG, msg = "Track changed: $title - $artist")
-
         provider?.player?.setSong(Song(name = title, artist = artist))
 
         val uri = resolveAudioUri(path)
@@ -122,7 +120,6 @@ object PowerAmp : YukiBaseHooker() {
             }
         }
 
-        YLog.debug(tag = TAG, msg = "No embedded lyrics found for: $title")
     }
 
     private fun resolveAudioUri(path: String): Uri? {
@@ -149,12 +146,10 @@ object PowerAmp : YukiBaseHooker() {
                 TagLib.getMetadata(pfd.dup().detachFd())?.let { metadata ->
                     val entry = metadata.propertyMap.entries.firstOrNull { (key, _) -> lyricTagRegex.matches(key) }
                     if (entry == null) {
-                        YLog.debug(tag = TAG, msg = "未找到内嵌歌词标签")
                         return@let null
                     }
                     val raw = entry.value.firstOrNull() ?: return@let null
                     YLog.info(tag = TAG, msg = "找到内嵌歌词，长度=${raw.length}")
-                    YLog.debug(tag = TAG, msg = "内嵌歌词前200字符: ${raw.take(200)}")
 
                     val lines = if (TTMLParser.isTTML(raw)) {
                         TTMLParser.parse(raw)
