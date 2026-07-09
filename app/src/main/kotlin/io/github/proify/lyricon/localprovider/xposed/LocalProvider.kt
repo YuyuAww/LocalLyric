@@ -52,7 +52,6 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
 
         val storageRoot = Environment.getExternalStorageDirectory()?.absolutePath ?: "/storage/emulated/0"
         val defaultDirs = listOf(
-            "$storageRoot/Lyrics",
             "$storageRoot/Music",
             "$storageRoot/Download"
         )
@@ -60,11 +59,9 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
             val dirFile = File(dir)
             if (!dirFile.exists()) {
                 dirFile.mkdirs()
-                YLog.debug(tag = TAG, msg = "Created directory: $dir")
             }
             if (!PathManager.getPaths(context).contains(dir)) {
                 PathManager.addPath(context, dir)
-                YLog.debug(tag = TAG, msg = "Added directory: $dir")
             }
         }
 
@@ -103,7 +100,6 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
     private fun handleMetadata(metadata: MediaMetadata) {
         // 如果是 PowerAmp，则跳过，由 PowerAmp Hooker 专门处理
         if (processName == POWERAMP_PACKAGE) {
-            YLog.debug(tag = TAG, msg = "Skip PowerAmp processing, handled by PowerAmp hook")
             return
         }
 
@@ -111,8 +107,6 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
         val title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE)
         val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST)
         val album = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM)
-
-        YLog.debug(tag = TAG, msg = "处理元数据: title='$title', artist='$artist', process=$processName")
 
         // 1. 常规路径解析
         var resolvedPath = resolveAudioPath(metadata)
@@ -131,8 +125,6 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
         if (resolvedPath == null && !title.isNullOrBlank()) {
             resolvedPath = getPathFromMediaStoreByTitleOnly(title)
         }
-
-        YLog.debug(tag = TAG, msg = "最终路径解析结果: $resolvedPath")
 
         DownloadManager.setCurrentAudioPath(resolvedPath)
 
@@ -251,8 +243,6 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
         selection.append(" OR ${MediaStore.Audio.Media.DATA} LIKE ?")
         selectionArgs.add("%$fileNamePattern%")
 
-        YLog.debug(tag = TAG, msg = "模糊查询: mainTitle=$mainTitle, mainArtist=$mainArtist")
-
         appContext?.contentResolver?.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             projection,
@@ -298,7 +288,6 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
     private fun tryLoadEmbeddedLyrics(filePath: String, title: String?, artist: String?): List<io.github.proify.lyricon.lyric.model.RichLyricLine>? {
         val audioFile = File(filePath)
         if (!audioFile.exists()) {
-            YLog.debug(tag = TAG, msg = "音频文件不存在: $filePath")
             return null
         }
 
@@ -310,28 +299,18 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
                         lyricTagRegex.matches(key)
                     }
                     if (entry == null) {
-                        YLog.debug(tag = TAG, msg = "未找到内嵌歌词标签")
                         return@let null
                     }
                     val raw = entry.value.firstOrNull()
                     YLog.info(tag = TAG, msg = "找到内嵌歌词，长度=${raw?.length}")
-                    YLog.debug(tag = TAG, msg = "内嵌歌词前200字符: ${raw?.take(200)}")
 
                     val lines = if (TTMLParser.isTTML(raw ?: "")) {
-                        YLog.debug(tag = TAG, msg = "检测到 TTML 格式")
                         val ttmlLines = TTMLParser.parse(raw!!)
-                        YLog.debug(tag = TAG, msg = "TTML 解析后行数: ${ttmlLines.size}")
                         ttmlLines.ensureWordSpacing()
                     } else {
-                        YLog.debug(tag = TAG, msg = "尝试 LRC 解析")
                         val doc = EnhanceLrcParser.parse(raw)
                         val lrcLines = doc.lines.filter { !it.text.isNullOrBlank() }
-                        YLog.debug(tag = TAG, msg = "LRC 解析后行数: ${lrcLines.size}")
                         lrcLines.ensureWordSpacing()
-                    }
-                    YLog.debug(tag = TAG, msg = "最终歌词行数: ${lines.size}")
-                    if (lines.isNotEmpty()) {
-                        YLog.debug(tag = TAG, msg = "第一行文本: ${lines.first().text}")
                     }
                     lines
                 }
@@ -347,15 +326,9 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
     }
 
     override fun onDownloadFinished(response: List<ProviderLyrics>) {
-        YLog.debug(tag = TAG, msg = "onDownloadFinished 收到响应，条目数: ${response.size}")
         val newSong = response.firstOrNull()?.lyrics?.toSong()?.ensureWordSpacing()
         if (newSong != null && newSong.lyrics?.isNotEmpty() == true) {
-            YLog.debug(tag = TAG, msg = "准备设置歌词，共 ${newSong.lyrics?.size} 行")
-            YLog.debug(tag = TAG, msg = "第一行文本: ${newSong.lyrics?.firstOrNull()?.text}")
             provider?.player?.setSong(newSong)
-            YLog.debug(tag = TAG, msg = "成功加载歌词")
-        } else {
-            YLog.debug(tag = TAG, msg = "未找到歌词，保留现有歌词")
         }
     }
 

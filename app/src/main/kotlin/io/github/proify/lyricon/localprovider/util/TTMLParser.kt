@@ -17,7 +17,6 @@ object TTMLParser {
     private val IGNORED_ROLES = setOf("x-bg") // 忽略背景歌词
 
     fun parse(ttml: String): List<RichLyricLine> {
-        val startTime = System.currentTimeMillis()
         val lines = mutableListOf<RichLyricLine>()
         val parser = Xml.newPullParser()
         parser.setInput(StringReader(ttml))
@@ -50,8 +49,6 @@ object TTMLParser {
             e.printStackTrace()
         }
 
-        val elapsed = System.currentTimeMillis() - startTime
-        Log.d(TAG, "Parsed ${lines.size} lines in ${elapsed}ms")
         return lines
     }
 

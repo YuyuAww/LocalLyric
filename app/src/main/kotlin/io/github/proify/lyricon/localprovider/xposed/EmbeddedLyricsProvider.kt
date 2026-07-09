@@ -29,38 +29,23 @@ object EmbeddedLyricsProvider {
         artistName: String?,
         albumName: String?
     ): LyricsResult? = withContext(Dispatchers.IO) {
-        val startTime = System.currentTimeMillis()
-
-        // 检查缓存
         lyricsCache[audioFilePath]?.let {
-            val elapsed = System.currentTimeMillis() - startTime
-            Log.d(TAG, "Cache hit for $audioFilePath, retrieved in ${elapsed}ms")
             return@withContext it
         }
 
-        Log.d(TAG, "尝试读取内嵌歌词: $audioFilePath")
         val audioFile = File(audioFilePath)
         if (!audioFile.exists()) {
-            Log.w(TAG, "音频文件不存在: $audioFilePath")
             return@withContext null
         }
 
         val uri = Uri.fromFile(audioFile)
         val raw = extractLyricFromTag(uri) ?: run {
-            Log.d(TAG, "未找到内嵌歌词标签")
             return@withContext null
         }
 
-        Log.d(TAG, "找到内嵌歌词，长度 ${raw.length} 字节")
-        Log.d(TAG, "内容前200字符: ${raw.take(200)}")
-
-        val parseStart = System.currentTimeMillis()
         val result = if (TTMLParser.isTTML(raw)) {
-            Log.d(TAG, "检测到 TTML 格式")
             val richLines = TTMLParser.parse(raw)
             if (richLines.isNotEmpty()) {
-                val parseEnd = System.currentTimeMillis()
-                Log.d(TAG, "TTML 解析成功，行数 ${richLines.size}，耗时 ${parseEnd - parseStart}ms")
                 val spaced = richLines.ensureWordSpacing()
                 LyricsResult(
                     trackName = trackName,
@@ -69,19 +54,14 @@ object EmbeddedLyricsProvider {
                     rich = spaced
                 )
             } else {
-                Log.w(TAG, "TTML 解析后为空")
                 null
             }
         } else {
-            Log.d(TAG, "不是 TTML 格式，尝试 LRC 解析")
             val doc = EnhanceLrcParser.parse(raw)
             val richLines = doc.lines
             if (richLines.isEmpty()) {
-                Log.w(TAG, "LRC 解析后为空")
                 null
             } else {
-                val parseEnd = System.currentTimeMillis()
-                Log.d(TAG, "LRC 解析成功，行数 ${richLines.size}，耗时 ${parseEnd - parseStart}ms")
                 val spaced = richLines.ensureWordSpacing()
                 LyricsResult(
                     trackName = trackName,
@@ -92,11 +72,8 @@ object EmbeddedLyricsProvider {
             }
         }
 
-        // 存入缓存
         if (result != null) {
             lyricsCache[audioFilePath] = result
-            val totalElapsed = System.currentTimeMillis() - startTime
-            Log.d(TAG, "歌词已缓存，总耗时 ${totalElapsed}ms")
         }
         result
     }
