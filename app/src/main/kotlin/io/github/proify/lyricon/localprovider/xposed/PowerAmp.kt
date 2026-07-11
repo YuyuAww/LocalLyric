@@ -54,6 +54,23 @@ object PowerAmp : YukiBaseHooker() {
             playerPackageName = context.packageName,
             logo = null
         ).apply {
+            // 启用自动同步，避免中心服务重启后歌词状态丢失
+            autoSync = true
+            // 监听连接状态，便于重连后同步及超时提示
+            service.addConnectionListener {
+                onConnected {
+                    YLog.info(tag = TAG, msg = "已连接 Lyricon 中心服务")
+                }
+                onReconnected {
+                    YLog.info(tag = TAG, msg = "已重新连接 Lyricon 中心服务")
+                }
+                onDisconnected {
+                    YLog.warn(tag = TAG, msg = "与 Lyricon 中心服务连接断开")
+                }
+                onConnectTimeout {
+                    YLog.warn(tag = TAG, msg = "连接 Lyricon 中心服务超时，请检查 Lyricon/LSPosed 状态")
+                }
+            }
             register()
             // 启用翻译和罗马音显示（符合 Lyricon 标准：展示需 Provider 主动开启）
             player.setDisplayTranslation(true)
@@ -105,6 +122,8 @@ object PowerAmp : YukiBaseHooker() {
         currentSongId = id
 
         provider?.player?.setSong(Song(name = title, artist = artist))
+        // 同步当前播放位置（符合 Lyricon 标准：setSong 后应同步进度）
+        provider?.player?.setPosition(0)
 
         val uri = resolveAudioUri(path)
         if (uri != null) {
@@ -118,6 +137,8 @@ object PowerAmp : YukiBaseHooker() {
                     lyrics = lyrics
                 )
                 provider?.player?.setSong(song)
+                // 同步播放位置（符合 Lyricon 标准：setSong 后应同步进度）
+                provider?.player?.setPosition(0)
                 YLog.info(tag = TAG, msg = "Embedded lyrics loaded for: $title")
                 return
             }
@@ -172,7 +193,9 @@ object PowerAmp : YukiBaseHooker() {
     private fun release() {
         trackReceiver?.let { appContext?.unregisterReceiver(it) }
         trackReceiver = null
+        // 符合 Lyricon 标准：先断开连接，再释放监听器和远端资源
         provider?.unregister()
+        provider?.destroy()
         provider = null
         YLog.info(tag = TAG, msg = "PowerAmp provider released")
     }

@@ -72,6 +72,23 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
             playerPackageName = context.packageName,
             processName = processName
         ).apply {
+            // 启用自动同步，避免中心服务重启后歌词状态丢失
+            autoSync = true
+            // 监听连接状态，便于重连后同步及超时提示
+            service.addConnectionListener {
+                onConnected {
+                    YLog.info(tag = TAG, msg = "已连接 Lyricon 中心服务")
+                }
+                onReconnected {
+                    YLog.info(tag = TAG, msg = "已重新连接 Lyricon 中心服务")
+                }
+                onDisconnected {
+                    YLog.warn(tag = TAG, msg = "与 Lyricon 中心服务连接断开")
+                }
+                onConnectTimeout {
+                    YLog.warn(tag = TAG, msg = "连接 Lyricon 中心服务超时，请检查 Lyricon/LSPosed 状态")
+                }
+            }
             register()
             // 启用翻译和罗马音显示（符合 Lyricon 标准：展示需 Provider 主动开启）
             player.setDisplayTranslation(true)
@@ -142,6 +159,8 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
 
         // 先发送基础歌曲信息（含真实时长）
         provider?.player?.setSong(Song(name = title, artist = artist, duration = duration))
+        // 同步当前播放位置（符合 Lyricon 标准：setSong 后应同步进度）
+        provider?.player?.setPosition(0)
 
         // 如果成功解析到路径，优先尝试读取内嵌歌词
         if (resolvedPath != null) {
@@ -155,6 +174,8 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
                     lyrics = embeddedLyrics
                 )
                 provider?.player?.setSong(song)
+                // 同步播放位置（符合 Lyricon 标准：setSong 后应同步进度）
+                provider?.player?.setPosition(0)
                 YLog.info(tag = TAG, msg = "成功加载内嵌歌词: $title")
                 return
             }
@@ -337,6 +358,8 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
         val newSong = response.firstOrNull()?.lyrics?.toSong(lastDuration)?.ensureWordSpacing()
         if (newSong != null && newSong.lyrics?.isNotEmpty() == true) {
             provider?.player?.setSong(newSong)
+            // 同步播放位置（符合 Lyricon 标准：setSong 后应同步进度）
+            provider?.player?.setPosition(0)
         }
     }
 
@@ -352,8 +375,9 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
     }
 
     private fun release() {
-        // 符合 Lyricon 标准：不再使用时调用 unregister() 释放资源
+        // 符合 Lyricon 标准：先断开连接，再释放监听器和远端资源
         provider?.unregister()
+        provider?.destroy()
         provider = null
         YLog.info(tag = TAG, msg = "LocalProvider released")
     }
