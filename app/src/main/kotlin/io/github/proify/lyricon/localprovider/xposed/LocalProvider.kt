@@ -34,6 +34,7 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
 
     private var provider: LyriconProvider? = null
     private var lastMediaSignature: String? = null
+    private var lastDuration: Long = 0L
 
     override fun onHook() {
         YLog.debug(tag = TAG, msg = "========== LocalProvider 已注入，进程名=$processName ==========")
@@ -70,7 +71,12 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
             providerPackageName = Constants.PROVIDER_PACKAGE_NAME,
             playerPackageName = context.packageName,
             processName = processName
-        ).apply { register() }
+        ).apply {
+            register()
+            // 启用翻译和罗马音显示（符合 Lyricon 标准：展示需 Provider 主动开启）
+            player.setDisplayTranslation(true)
+            player.setDisplayRoma(true)
+        }
     }
 
     private fun hookMediaSession() {
@@ -107,6 +113,7 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
         val title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE)
         val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST)
         val album = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM)
+        val duration = metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)
 
         // 1. 常规路径解析
         var resolvedPath = resolveAudioPath(metadata)
@@ -131,9 +138,10 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
         val signature = calculateSignature(id, title, artist, album)
         if (signature == lastMediaSignature) return
         lastMediaSignature = signature
+        lastDuration = duration
 
-        // 先发送基础歌曲信息
-        provider?.player?.setSong(Song(name = title, artist = artist))
+        // 先发送基础歌曲信息（含真实时长）
+        provider?.player?.setSong(Song(name = title, artist = artist, duration = duration))
 
         // 如果成功解析到路径，优先尝试读取内嵌歌词
         if (resolvedPath != null) {
@@ -143,7 +151,7 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
                     id = id,
                     name = title,
                     artist = artist,
-                    duration = 0,
+                    duration = duration,
                     lyrics = embeddedLyrics
                 )
                 provider?.player?.setSong(song)
@@ -326,7 +334,7 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
     }
 
     override fun onDownloadFinished(response: List<ProviderLyrics>) {
-        val newSong = response.firstOrNull()?.lyrics?.toSong()?.ensureWordSpacing()
+        val newSong = response.firstOrNull()?.lyrics?.toSong(lastDuration)?.ensureWordSpacing()
         if (newSong != null && newSong.lyrics?.isNotEmpty() == true) {
             provider?.player?.setSong(newSong)
         }
@@ -336,14 +344,17 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
         YLog.error(tag = TAG, msg = "歌词搜索失败: ${e.message}")
     }
 
-    private fun LyricsResult.toSong() = Song().apply {
+    private fun LyricsResult.toSong(duration: Long) = Song().apply {
         name = trackName
         artist = artistName
         lyrics = rich
-        duration = rich.lastOrNull()?.end ?: 0L
+        this.duration = duration
     }
 
     private fun release() {
+        // 符合 Lyricon 标准：不再使用时调用 unregister() 释放资源
+        provider?.unregister()
+        provider = null
         YLog.info(tag = TAG, msg = "LocalProvider released")
     }
 }

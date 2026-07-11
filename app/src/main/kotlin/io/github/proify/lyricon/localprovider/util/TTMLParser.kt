@@ -29,16 +29,15 @@ object TTMLParser {
                     val end = parseTime(parser.getAttributeValue(null, "end"))
                     val (mainText, translationText) = extractTextFromTag(parser)
                     if (mainText.isNotEmpty()) {
-                        val translation = if (!translationText.isNullOrBlank()) translationText else null
-                        // 有翻译时用换行符合并显示双行，无翻译时保持单行
-                        val finalText = if (translation != null) "$mainText\n$translation" else mainText
+                        // 翻译填入标准 translation 字段，由展示端按开关控制显示
+                        val translation = translationText?.takeIf { it.isNotBlank() }
                         lines.add(
                             RichLyricLine(
                                 begin = begin,
                                 end = end,
-                                text = finalText,
-                                secondary = null,   // 避免UI自动填充下一句
-                                translation = null  // 同上
+                                text = mainText,
+                                secondary = null,
+                                translation = translation
                             )
                         )
                     }

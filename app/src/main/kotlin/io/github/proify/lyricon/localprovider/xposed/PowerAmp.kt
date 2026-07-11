@@ -55,6 +55,9 @@ object PowerAmp : YukiBaseHooker() {
             logo = null
         ).apply {
             register()
+            // 启用翻译和罗马音显示（符合 Lyricon 标准：展示需 Provider 主动开启）
+            player.setDisplayTranslation(true)
+            player.setDisplayRoma(true)
         }
         YLog.info(tag = TAG, msg = "Lyricon Provider registered")
     }
