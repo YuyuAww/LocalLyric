@@ -22,6 +22,7 @@ import io.github.proify.lyricon.localprovider.model.LyricsResult
 import io.github.proify.lyricon.localprovider.util.ensureWordSpacing
 import io.github.proify.lyricon.localprovider.util.TTMLParser
 import io.github.proify.lyricon.lyric.model.Song
+import io.github.proify.lyricon.provider.ConnectionListener
 import io.github.proify.lyricon.provider.LyriconFactory
 import io.github.proify.lyricon.provider.LyriconProvider
 import java.io.File
@@ -75,20 +76,20 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
             // 启用自动同步，避免中心服务重启后歌词状态丢失
             autoSync = true
             // 监听连接状态，便于重连后同步及超时提示
-            service.addConnectionListener {
-                onConnected {
+            service.addConnectionListener(object : ConnectionListener {
+                override fun onConnected(provider: LyriconProvider) {
                     YLog.info(tag = TAG, msg = "已连接 Lyricon 中心服务")
                 }
-                onReconnected {
+                override fun onReconnected(provider: LyriconProvider) {
                     YLog.info(tag = TAG, msg = "已重新连接 Lyricon 中心服务")
                 }
-                onDisconnected {
+                override fun onDisconnected(provider: LyriconProvider) {
                     YLog.warn(tag = TAG, msg = "与 Lyricon 中心服务连接断开")
                 }
-                onConnectTimeout {
+                override fun onConnectTimeout(provider: LyriconProvider) {
                     YLog.warn(tag = TAG, msg = "连接 Lyricon 中心服务超时，请检查 Lyricon/LSPosed 状态")
                 }
-            }
+            })
             register()
             // 启用翻译和罗马音显示（符合 Lyricon 标准：展示需 Provider 主动开启）
             player.setDisplayTranslation(true)
