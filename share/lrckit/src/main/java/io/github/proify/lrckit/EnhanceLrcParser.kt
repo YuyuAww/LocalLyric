@@ -89,7 +89,7 @@ object EnhanceLrcParser {
         val letters = text.filter { it.isLetter() }
         if (letters.isEmpty()) return false
         val asciiLetters = letters.count { it.code < 128 }
-        return asciiLetters.toFloat() / letters.size > 0.8f
+        return asciiLetters.toFloat() / letters.length > 0.8f
     }
 
     private fun parseStandardLine(
