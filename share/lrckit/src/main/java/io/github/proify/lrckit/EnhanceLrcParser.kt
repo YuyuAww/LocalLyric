@@ -56,19 +56,40 @@ object EnhanceLrcParser {
     private fun mergeLines(lines: MutableList<RichLyricLine>, cur: RichLyricLine) {
         val last = lines.lastOrNull()
         if (last != null && last.begin == cur.begin) {
-            // 第一次同时间戳辅助文本存为 secondary（罗马音）
-            // 第二次同时间戳辅助文本存为 translation（翻译）
-            if (last.secondary == null) {
-                last.secondary = cur.text
-                last.secondaryWords = cur.words
-            } else if (last.translation == null) {
-                last.translation = cur.text
-                last.translationWords = cur.words
+            // 同时间戳辅助行分类：
+            // - 罗马音（主要由 ASCII 拉丁字母组成）→ roma 字段
+            // - 翻译 → translation 字段
+            // - 其余 → secondary 字段（保留给背景人声等次要文本，亦由 [bg:] 标签写入）
+            when {
+                isRomanization(cur.text) && last.roma == null -> {
+                    last.roma = cur.text
+                }
+                last.translation == null -> {
+                    last.translation = cur.text
+                    last.translationWords = cur.words
+                }
+                last.secondary == null -> {
+                    last.secondary = cur.text
+                    last.secondaryWords = cur.words
+                }
             }
             if (cur.isAlignedRight) last.isAlignedRight = true
         } else {
             lines.add(cur)
         }
+    }
+
+    /**
+     * 判断文本是否为罗马音。
+     * 罗马音主要由 ASCII 拉丁字母组成（如 "ha ku chu u mu"），
+     * 据此与翻译（通常为目标语言文字，如中文）区分。
+     */
+    private fun isRomanization(text: String?): Boolean {
+        if (text.isNullOrBlank()) return false
+        val letters = text.filter { it.isLetter() }
+        if (letters.isEmpty()) return false
+        val asciiLetters = letters.count { it.code < 128 }
+        return asciiLetters.toFloat() / letters.size > 0.8f
     }
 
     private fun parseStandardLine(

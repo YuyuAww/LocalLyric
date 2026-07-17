@@ -27,17 +27,18 @@ object TTMLParser {
                 if (eventType == XmlPullParser.START_TAG && getLocalName(parser) == "p") {
                     val begin = parseTime(parser.getAttributeValue(null, "begin"))
                     val end = parseTime(parser.getAttributeValue(null, "end"))
-                    val (mainText, translationText) = extractTextFromTag(parser)
+                    val (mainText, translationText, romaText) = extractTextFromTag(parser)
                     if (mainText.isNotEmpty()) {
-                        // 翻译填入标准 translation 字段，由展示端按开关控制显示
+                        // 翻译填入 translation 字段，罗马音填入 roma 字段，由展示端按开关控制显示
                         val translation = translationText?.takeIf { it.isNotBlank() }
+                        val roma = romaText?.takeIf { it.isNotBlank() }
                         lines.add(
                             RichLyricLine(
                                 begin = begin,
                                 end = end,
                                 text = mainText,
-                                secondary = null,
-                                translation = translation
+                                translation = translation,
+                                roma = roma
                             )
                         )
                     }
@@ -51,10 +52,11 @@ object TTMLParser {
         return lines
     }
 
-    private fun extractTextFromTag(parser: XmlPullParser): Pair<String, String?> {
+    private fun extractTextFromTag(parser: XmlPullParser): Triple<String, String?, String?> {
         val depth = parser.depth
         val mainText = StringBuilder()
         val transText = StringBuilder()
+        val romaText = StringBuilder()
         var eventType = parser.next()
         while (eventType != XmlPullParser.END_TAG || parser.depth > depth) {
             when (eventType) {
@@ -69,6 +71,10 @@ object TTMLParser {
                             role == "x-translation" -> {
                                 transText.append(extractSpanText(parser))
                             }
+                            // 罗马音角色：兼容 x-romanization 与 x-roma 两种写法
+                            role == "x-romanization" || role == "x-roma" -> {
+                                romaText.append(extractSpanText(parser))
+                            }
                             else -> {
                                 mainText.append(extractSpanText(parser))
                             }
@@ -81,7 +87,11 @@ object TTMLParser {
             }
             eventType = parser.next()
         }
-        return mainText.toString().trim() to transText.toString().trim().takeIf { it.isNotBlank() }
+        return Triple(
+            mainText.toString().trim(),
+            transText.toString().trim().takeIf { it.isNotBlank() },
+            romaText.toString().trim().takeIf { it.isNotBlank() }
+        )
     }
 
     private fun extractSpanText(parser: XmlPullParser): String {

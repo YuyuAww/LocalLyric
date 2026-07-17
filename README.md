@@ -174,9 +174,8 @@ RichLyricLine(
         LyricWord(begin=18870, end=19343, text="て"),
     ),
 
-    // 罗马音（第 2 行）：无逐字时间轴
-    secondary = "ha ku chu u mu   tsu na i de i te",
-    secondaryWords = null,
+    // 罗马音（第 2 行）：无逐字时间轴，存入 roma 字段
+    roma = "ha ku chu u mu   tsu na i de i te",
 
     // 翻译（第 3 行）：无逐字时间轴
     translation = "白日之梦 相互牵系",
@@ -186,13 +185,15 @@ RichLyricLine(
 )
 ```
 
-**多行合并规则**（`mergeLines`）：相同起始时间戳的多行按顺序分别存储：
+**多行合并规则**（`mergeLines`）：相同起始时间戳的多行按内容分类存储：
 
 | 顺序 | 字段 | 说明 |
 |------|------|------|
 | 第 1 行 | `text` + `words` | 主歌词（含逐字时间轴） |
-| 第 2 行 | `secondary` + `secondaryWords` | 辅助行 / 罗马音 |
+| 第 2 行 | `roma` | 罗马音（主要由 ASCII 拉丁字母组成的注音行） |
 | 第 3 行 | `translation` + `translationWords` | 翻译行 |
+
+> `secondary` 字段保留给背景人声等次要文本（由 `[bg:]` 标签写入），不再用于罗马音。
 
 **TTML 格式示例**：
 
@@ -211,7 +212,7 @@ RichLyricLine(
 </tt>
 ```
 
-TTML 格式中 `role="x-translation"` 的行会被提取为 `translation` 字段，`role="x-bg"` 的背景歌词会被过滤。
+TTML 格式中 `role="x-translation"` 的行会被提取为 `translation` 字段，`role="x-romanization"`（或 `x-roma`）的行会被提取为 `roma` 字段，`role="x-bg"` 的背景歌词会被过滤。
 
 ### 5. 共享模块 (`share/`)
 
@@ -244,10 +245,12 @@ data class EnhanceLrcDocument(
 
 **多行辅助文本合并（mergeLines）**
 
-当有多行歌词使用相同起始时间戳时，`mergeLines` 会按顺序分别存储：
+当有多行歌词使用相同起始时间戳时，`mergeLines` 会按内容分类存储：
 - 第 1 行：主行（`text` + `words`）
-- 第 2 行：辅助行/罗马音（`secondary` + `secondaryWords`）
+- 第 2 行：罗马音（`roma`，由 ASCII 拉丁字母占比判定）
 - 第 3 行：翻译行（`translation` + `translationWords`）
+
+`secondary` 字段保留给背景人声等次要文本（由 `[bg:]` 标签写入），不再用于罗马音。
 
 #### extensions-kt — Kotlin 通用扩展
 
