@@ -44,19 +44,19 @@ object LocalProvider : DownloadCallback {
     private var lastMediaSignature: String? = null
     private var lastDuration: Long = 0L
 
-    fun setup(xosed: XposedInterface, classLoader: ClassLoader, packageName: String, processName: String) {
+    fun setup(xposed: XposedInterface, classLoader: ClassLoader, packageName: String, processName: String) {
         if (isSetup) return
         isSetup = true
-        this.xosed = xosed
+        this.xposed = xposed
         this.classLoader = classLoader
         this.processName = processName
 
-        xosed.log(Log.DEBUG, TAG, "========== LocalProvider 已注入，进程名=$processName ==========")
+        xposed.log(Log.DEBUG, TAG, "========== LocalProvider 已注入，进程名=$processName ==========")
         hookActivityLifecycle()
     }
 
     private fun hookActivityLifecycle() {
-        val x = xosed ?: return
+        val x = xposed ?: return
         val cl = classLoader ?: return
 
         val activityClass = Class.forName("android.app.Activity", false, cl)
@@ -108,16 +108,16 @@ object LocalProvider : DownloadCallback {
             // 监听连接状态，便于重连后同步及超时提示
             service.addConnectionListener(object : ConnectionListener {
                 override fun onConnected(provider: LyriconProvider) {
-                    xosed?.log(Log.INFO, TAG, "已连接 Lyricon 中心服务")
+                    xposed?.log(Log.INFO, TAG, "已连接 Lyricon 中心服务")
                 }
                 override fun onReconnected(provider: LyriconProvider) {
-                    xosed?.log(Log.INFO, TAG, "已重新连接 Lyricon 中心服务")
+                    xposed?.log(Log.INFO, TAG, "已重新连接 Lyricon 中心服务")
                 }
                 override fun onDisconnected(provider: LyriconProvider) {
-                    xosed?.log(Log.WARN, TAG, "与 Lyricon 中心服务连接断开")
+                    xposed?.log(Log.WARN, TAG, "与 Lyricon 中心服务连接断开")
                 }
                 override fun onConnectTimeout(provider: LyriconProvider) {
-                    xosed?.log(Log.WARN, TAG, "连接 Lyricon 中心服务超时，请检查 Lyricon/LSPosed 状态")
+                    xposed?.log(Log.WARN, TAG, "连接 Lyricon 中心服务超时，请检查 Lyricon/LSPosed 状态")
                 }
             })
             register()
@@ -128,7 +128,7 @@ object LocalProvider : DownloadCallback {
     }
 
     private fun hookMediaSession() {
-        val x = xosed ?: return
+        val x = xposed ?: return
         val cl = classLoader ?: return
 
         val mediaSessionClass = Class.forName("android.media.session.MediaSession", false, cl)
@@ -210,7 +210,7 @@ object LocalProvider : DownloadCallback {
                 provider?.player?.setSong(song)
                 // 同步播放位置（符合 Lyricon 标准：setSong 后应同步进度）
                 provider?.player?.setPosition(0)
-                xosed?.log(Log.INFO, TAG, "成功加载内嵌歌词: $title")
+                xposed?.log(Log.INFO, TAG, "成功加载内嵌歌词: $title")
                 return
             }
         }
@@ -365,7 +365,7 @@ object LocalProvider : DownloadCallback {
                         return@let null
                     }
                     val raw = entry.value.firstOrNull()
-                    xosed?.log(Log.INFO, TAG, "找到内嵌歌词，长度=${raw?.length}")
+                    xposed?.log(Log.INFO, TAG, "找到内嵌歌词，长度=${raw?.length}")
 
                     val lines = if (TTMLParser.isTTML(raw ?: "")) {
                         val ttmlLines = TTMLParser.parse(raw!!)
@@ -379,7 +379,7 @@ object LocalProvider : DownloadCallback {
                 }
             }
         } catch (e: Exception) {
-            xosed?.log(Log.ERROR, TAG, "读取内嵌歌词失败", e)
+            xposed?.log(Log.ERROR, TAG, "读取内嵌歌词失败", e)
             null
         }
     }
@@ -398,7 +398,7 @@ object LocalProvider : DownloadCallback {
     }
 
     override fun onDownloadFailed(e: Exception) {
-        xosed?.log(Log.ERROR, TAG, "歌词搜索失败: ${e.message}", e)
+        xposed?.log(Log.ERROR, TAG, "歌词搜索失败: ${e.message}", e)
     }
 
     private fun LyricsResult.toSong(duration: Long) = Song().apply {
@@ -413,6 +413,6 @@ object LocalProvider : DownloadCallback {
         provider?.unregister()
         provider?.destroy()
         provider = null
-        xosed?.log(Log.INFO, TAG, "LocalProvider released")
+        xposed?.log(Log.INFO, TAG, "LocalProvider released")
     }
 }
