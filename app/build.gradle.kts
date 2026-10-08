@@ -8,7 +8,6 @@ import com.android.build.api.dsl.ApplicationExtension
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.ksp)
     kotlin("plugin.serialization") version "2.1.21"
 }
 
@@ -70,6 +69,12 @@ configure<ApplicationExtension> {
     buildFeatures {
         buildConfig = true
     }
+
+    packaging {
+        resources {
+            merges += "META-INF/xposed/*"
+        }
+    }
 }
 
 dependencies {
@@ -80,13 +85,9 @@ dependencies {
 
     // 其他依赖
     implementation(libs.lyricon.provider)
-    implementation(libs.yukihookapi.api)
-    implementation(libs.kavaref.core)
-    implementation(libs.kavaref.extension)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.taglib)      // 内嵌歌词需要
-    compileOnly(libs.xposed.api)
-    ksp(libs.yukihookapi.ksp.xposed)
+    compileOnly(libs.libxposed.api)
 }

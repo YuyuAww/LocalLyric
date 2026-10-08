@@ -9,9 +9,8 @@
 package io.github.proify.extensions.android
 
 import android.annotation.SuppressLint
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
+import android.util.Log
+import io.github.libxposed.api.XposedInterface
 import java.lang.reflect.Field
 import java.util.concurrent.CopyOnWriteArraySet
 
@@ -19,7 +18,7 @@ object Flyme {
     const val FLAG_ALWAYS_SHOW_TICKER_HOOK = 0x01000000
     const val FLAG_ONLY_UPDATE_TICKER_HOOK = 0x02000000
 
-    private val unhooks = CopyOnWriteArraySet<XC_MethodHook.Unhook>()
+    private val hookHandles = CopyOnWriteArraySet<XposedInterface.HookHandle>()
 
     private var cachedAlwaysShowField: Field? = null
     private var cachedOnlyUpdateField: Field? = null
@@ -35,16 +34,16 @@ object Flyme {
     )
 
     fun unlock() {
-        unhooks.forEach { it.unhook() }
-        unhooks.clear()
+        hookHandles.forEach { it.unhook() }
+        hookHandles.clear()
     }
 
     @SuppressLint("PrivateApi")
-    fun mock(loader: ClassLoader) {
+    fun mock(xosed: XposedInterface, loader: ClassLoader) {
         try {
-            initFieldsCache()
+            initFieldsCache(xosed)
 
-            val buildClass = XposedHelpers.findClass("android.os.Build", loader)
+            val buildClass = Class.forName("android.os.Build", false, loader)
             val buildFields = mapOf(
                 "BRAND" to "meizu",
                 "MANUFACTURER" to "Meizu",
@@ -54,68 +53,59 @@ object Flyme {
                 "MODEL" to "meizu 16th Plus"
             )
             buildFields.forEach { (k, v) ->
-                XposedHelpers.setStaticObjectField(buildClass, k, v)
+                val field = buildClass.getDeclaredField(k)
+                field.isAccessible = true
+                field.set(null, v)
             }
 
-            val spClass = XposedHelpers.findClass("android.os.SystemProperties", loader)
-            val spHook = object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    val key = param.args[0] as? String ?: return
-                    spoofMap[key]?.let { param.result = it }
+            val spClass = Class.forName("android.os.SystemProperties", false, loader)
+            val getOneArg = spClass.getDeclaredMethod("get", String::class.java)
+            hookHandles += xosed.hook(getOneArg).intercept { chain ->
+                val key = chain.args[0] as? String
+                spoofMap[key] ?: chain.proceed()
+            }
+
+            val getTwoArg = spClass.getDeclaredMethod("get", String::class.java, String::class.java)
+            hookHandles += xosed.hook(getTwoArg).intercept { chain ->
+                val key = chain.args[0] as? String
+                spoofMap[key] ?: chain.proceed()
+            }
+
+            val getField = Class::class.java.getDeclaredMethod("getField", String::class.java)
+            hookHandles += xosed.hook(getField).intercept { chain ->
+                val result = chain.proceed()
+                val name = chain.args[0] as? String
+                when (name) {
+                    "FLAG_ALWAYS_SHOW_TICKER" -> cachedAlwaysShowField ?: result
+                    "FLAG_ONLY_UPDATE_TICKER" -> cachedOnlyUpdateField ?: result
+                    else -> result
                 }
             }
-            unhooks += XposedHelpers.findAndHookMethod(spClass, "get", String::class.java, spHook)
-            unhooks += XposedHelpers.findAndHookMethod(
-                spClass,
-                "get",
-                String::class.java,
-                String::class.java,
-                spHook
-            )
 
-            val fieldHook = GetFieldMethodHook()
-            unhooks += XposedHelpers.findAndHookMethod(
-                Class::class.java,
-                "getField",
-                String::class.java,
-                fieldHook
-            )
-            unhooks += XposedHelpers.findAndHookMethod(
-                Class::class.java,
-                "getDeclaredField",
-                String::class.java,
-                fieldHook
-            )
+            val getDeclaredField = Class::class.java.getDeclaredMethod("getDeclaredField", String::class.java)
+            hookHandles += xosed.hook(getDeclaredField).intercept { chain ->
+                val result = chain.proceed()
+                val name = chain.args[0] as? String
+                when (name) {
+                    "FLAG_ALWAYS_SHOW_TICKER" -> cachedAlwaysShowField ?: result
+                    "FLAG_ONLY_UPDATE_TICKER" -> cachedOnlyUpdateField ?: result
+                    else -> result
+                }
+            }
 
         } catch (t: Throwable) {
-            XposedBridge.log("Flyme Mock Error: ${t.message}")
+            xosed.log(Log.ERROR, "Flyme", "Flyme Mock Error: ${t.message}", t)
         }
     }
 
-    private fun initFieldsCache() {
+    private fun initFieldsCache(xosed: XposedInterface) {
         try {
             cachedAlwaysShowField =
                 Flyme::class.java.getDeclaredField("FLAG_ALWAYS_SHOW_TICKER_HOOK")
             cachedOnlyUpdateField =
                 Flyme::class.java.getDeclaredField("FLAG_ONLY_UPDATE_TICKER_HOOK")
         } catch (e: Exception) {
-            XposedBridge.log("Failed to cache fields: $e")
-        }
-    }
-
-    private class GetFieldMethodHook : XC_MethodHook() {
-        override fun afterHookedMethod(param: MethodHookParam) {
-            val name = param.args[0] as? String ?: return
-
-            when (name) {
-                "FLAG_ALWAYS_SHOW_TICKER" -> {
-                    cachedAlwaysShowField?.let { param.result = it }
-                }
-
-                "FLAG_ONLY_UPDATE_TICKER" -> {
-                    cachedOnlyUpdateField?.let { param.result = it }
-                }
-            }
+            xosed.log(Log.ERROR, "Flyme", "Failed to cache fields: $e", e)
         }
     }
 }

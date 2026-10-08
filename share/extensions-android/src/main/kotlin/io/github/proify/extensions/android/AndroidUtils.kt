@@ -6,27 +6,22 @@
 
 package io.github.proify.extensions.android
 
-import de.robv.android.xposed.XC_MethodReplacement
-import de.robv.android.xposed.XposedHelpers
+import android.util.Log
+import io.github.libxposed.api.XposedInterface
 
 /**
  * @author Lin
  */
 object AndroidUtils {
-    fun openBluetoothA2dpOn(classLoader: ClassLoader?) {
+    fun openBluetoothA2dpOn(xosed: XposedInterface, classLoader: ClassLoader?) {
         if (classLoader == null) return
-        XposedHelpers.findAndHookMethod(
-            "android.media.AudioManager",
-            classLoader,
-            "isBluetoothA2dpOn",
-            XC_MethodReplacement.returnConstant(true)
-        )
-        XposedHelpers.findAndHookMethod(
-            "android.bluetooth.BluetoothAdapter",
-            classLoader,
-            "isEnabled",
-            XC_MethodReplacement.returnConstant(true)
-        )
+        val audioManagerClass = Class.forName("android.media.AudioManager", false, classLoader)
+        val isBluetoothA2dpOn = audioManagerClass.getDeclaredMethod("isBluetoothA2dpOn")
+        xosed.hook(isBluetoothA2dpOn).intercept { _ -> true }
+
+        val bluetoothAdapterClass = Class.forName("android.bluetooth.BluetoothAdapter", false, classLoader)
+        val isEnabled = bluetoothAdapterClass.getDeclaredMethod("isEnabled")
+        xosed.hook(isEnabled).intercept { _ -> true }
     }
 
 //    fun getStringForStateInt(state: Int): String {

@@ -21,15 +21,11 @@
 
         <meta-data
             android:name="xposedminversion"
-            android:value="93" />
+            android:value="102" />
 
         <meta-data
             android:name="xposedscope"
             android:resource="@array/xposed_scope" />
-
-        <meta-data
-            android:name="xposedsharedprefs"
-            android:value="true" />
 
         <!-- Lyricon 插件元数据 -->
         <meta-data

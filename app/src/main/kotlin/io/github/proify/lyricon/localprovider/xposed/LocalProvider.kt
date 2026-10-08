@@ -6,46 +6,74 @@
 
 package io.github.proify.lyricon.localprovider.xposed
 
+import android.app.Activity
 import android.content.Context
 import android.media.MediaMetadata
 import android.media.session.PlaybackState
 import android.net.Uri
+import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import com.highcapable.kavaref.KavaRef.Companion.resolve
-import com.highcapable.yukihookapi.hook.entity.YukiBaseHooker
-import com.highcapable.yukihookapi.hook.log.YLog
+import android.util.Log
 import com.kyant.taglib.TagLib
+import io.github.libxposed.api.XposedInterface
 import io.github.proify.lrckit.EnhanceLrcParser
-import io.github.proify.lyricon.localprovider.model.ProviderLyrics
 import io.github.proify.lyricon.localprovider.model.LyricsResult
-import io.github.proify.lyricon.localprovider.util.ensureWordSpacing
+import io.github.proify.lyricon.localprovider.model.ProviderLyrics
 import io.github.proify.lyricon.localprovider.util.TTMLParser
+import io.github.proify.lyricon.localprovider.util.ensureWordSpacing
 import io.github.proify.lyricon.lyric.model.Song
 import io.github.proify.lyricon.provider.ConnectionListener
 import io.github.proify.lyricon.provider.LyriconFactory
 import io.github.proify.lyricon.provider.LyriconProvider
 import java.io.File
 
-object LocalProvider : YukiBaseHooker(), DownloadCallback {
+object LocalProvider : DownloadCallback {
     private const val TAG = "LocalProvider"
     private const val POWERAMP_PACKAGE = "com.maxmpz.audioplayer"
 
     private val lyricTagRegex by lazy { Regex("(?i)\\b(LYRICS|LYRICS\\d*|USLT)\\b") }
 
+    private var xposed: XposedInterface? = null
+    private var classLoader: ClassLoader? = null
+    private var appContext: Context? = null
+    private var processName: String = ""
+    private var isSetup = false
+
     private var provider: LyriconProvider? = null
     private var lastMediaSignature: String? = null
     private var lastDuration: Long = 0L
 
-    override fun onHook() {
-        YLog.debug(tag = TAG, msg = "========== LocalProvider 已注入，进程名=$processName ==========")
+    fun setup(xosed: XposedInterface, classLoader: ClassLoader, packageName: String, processName: String) {
+        if (isSetup) return
+        isSetup = true
+        this.xosed = xosed
+        this.classLoader = classLoader
+        this.processName = processName
 
-        onAppLifecycle {
-            onCreate {
-                initProvider()
-                hookMediaSession()
-            }
-            onTerminate { release() }
+        xosed.log(Log.DEBUG, TAG, "========== LocalProvider 已注入，进程名=$processName ==========")
+        hookActivityLifecycle()
+    }
+
+    private fun hookActivityLifecycle() {
+        val x = xosed ?: return
+        val cl = classLoader ?: return
+
+        val activityClass = Class.forName("android.app.Activity", false, cl)
+
+        val onCreate = activityClass.getDeclaredMethod("onCreate", Bundle::class.java)
+        x.hook(onCreate).intercept { chain ->
+            val activity = chain.thisObject as? Activity
+            appContext = activity?.applicationContext
+            chain.proceed()
+            initProvider()
+            hookMediaSession()
+        }
+
+        val onTerminate = activityClass.getDeclaredMethod("onTerminate")
+        x.hook(onTerminate).intercept { chain ->
+            chain.proceed()
+            release()
         }
     }
 
@@ -78,16 +106,16 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
             // 监听连接状态，便于重连后同步及超时提示
             service.addConnectionListener(object : ConnectionListener {
                 override fun onConnected(provider: LyriconProvider) {
-                    YLog.info(tag = TAG, msg = "已连接 Lyricon 中心服务")
+                    xosed?.log(Log.INFO, TAG, "已连接 Lyricon 中心服务")
                 }
                 override fun onReconnected(provider: LyriconProvider) {
-                    YLog.info(tag = TAG, msg = "已重新连接 Lyricon 中心服务")
+                    xosed?.log(Log.INFO, TAG, "已重新连接 Lyricon 中心服务")
                 }
                 override fun onDisconnected(provider: LyriconProvider) {
-                    YLog.warn(tag = TAG, msg = "与 Lyricon 中心服务连接断开")
+                    xosed?.log(Log.WARN, TAG, "与 Lyricon 中心服务连接断开")
                 }
                 override fun onConnectTimeout(provider: LyriconProvider) {
-                    YLog.warn(tag = TAG, msg = "连接 Lyricon 中心服务超时，请检查 Lyricon/LSPosed 状态")
+                    xosed?.log(Log.WARN, TAG, "连接 Lyricon 中心服务超时，请检查 Lyricon/LSPosed 状态")
                 }
             })
             register()
@@ -98,26 +126,23 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
     }
 
     private fun hookMediaSession() {
-        "android.media.session.MediaSession".toClass().resolve().apply {
-            firstMethod {
-                name = "setPlaybackState"
-                parameters(PlaybackState::class.java)
-            }.hook {
-                after {
-                    val state = args[0] as? PlaybackState ?: return@after
-                    provider?.player?.setPlaybackState(state)
-                }
-            }
+        val x = xosed ?: return
+        val cl = classLoader ?: return
 
-            firstMethod {
-                name = "setMetadata"
-                parameters("android.media.MediaMetadata")
-            }.hook {
-                after {
-                    val metadata = args[0] as? MediaMetadata ?: return@after
-                    handleMetadata(metadata)
-                }
-            }
+        val mediaSessionClass = Class.forName("android.media.session.MediaSession", false, cl)
+
+        val setPlaybackState = mediaSessionClass.getDeclaredMethod("setPlaybackState", PlaybackState::class.java)
+        x.hook(setPlaybackState).intercept { chain ->
+            chain.proceed()
+            val state = chain.args[0] as? PlaybackState ?: return@intercept
+            provider?.player?.setPlaybackState(state)
+        }
+
+        val setMetadata = mediaSessionClass.getDeclaredMethod("setMetadata", MediaMetadata::class.java)
+        x.hook(setMetadata).intercept { chain ->
+            chain.proceed()
+            val metadata = chain.args[0] as? MediaMetadata ?: return@intercept
+            handleMetadata(metadata)
         }
     }
 
@@ -177,7 +202,7 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
                 provider?.player?.setSong(song)
                 // 同步播放位置（符合 Lyricon 标准：setSong 后应同步进度）
                 provider?.player?.setPosition(0)
-                YLog.info(tag = TAG, msg = "成功加载内嵌歌词: $title")
+                xosed?.log(Log.INFO, TAG, "成功加载内嵌歌词: $title")
                 return
             }
         }
@@ -332,7 +357,7 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
                         return@let null
                     }
                     val raw = entry.value.firstOrNull()
-                    YLog.info(tag = TAG, msg = "找到内嵌歌词，长度=${raw?.length}")
+                    xosed?.log(Log.INFO, TAG, "找到内嵌歌词，长度=${raw?.length}")
 
                     val lines = if (TTMLParser.isTTML(raw ?: "")) {
                         val ttmlLines = TTMLParser.parse(raw!!)
@@ -346,7 +371,7 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
                 }
             }
         } catch (e: Exception) {
-            YLog.error(tag = TAG, msg = "读取内嵌歌词失败", e = e)
+            xosed?.log(Log.ERROR, TAG, "读取内嵌歌词失败", e)
             null
         }
     }
@@ -365,7 +390,7 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
     }
 
     override fun onDownloadFailed(e: Exception) {
-        YLog.error(tag = TAG, msg = "歌词搜索失败: ${e.message}")
+        xosed?.log(Log.ERROR, TAG, "歌词搜索失败: ${e.message}", e)
     }
 
     private fun LyricsResult.toSong(duration: Long) = Song().apply {
@@ -380,6 +405,6 @@ object LocalProvider : YukiBaseHooker(), DownloadCallback {
         provider?.unregister()
         provider?.destroy()
         provider = null
-        YLog.info(tag = TAG, msg = "LocalProvider released")
+        xosed?.log(Log.INFO, TAG, "LocalProvider released")
     }
 }

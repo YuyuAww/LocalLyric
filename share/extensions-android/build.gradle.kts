@@ -42,13 +42,9 @@ configure<LibraryExtension> {
 dependencies {
     api(project(":share:extensions-kt"))
 
-    implementation(libs.yukihookapi.api)
-    implementation(libs.kavaref.core)
-    implementation(libs.kavaref.extension)
-    compileOnly(libs.xposed.api)
-
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.ktx)
+    compileOnly(libs.libxposed.api)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

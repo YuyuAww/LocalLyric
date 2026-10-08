@@ -1,10 +1,14 @@
 # 保留 Xposed 入口和 Hook 类
 -keep class io.github.proify.lyricon.localprovider.xposed.HookEntry
 -keep class io.github.proify.lyricon.localprovider.xposed.LocalProvider
+-keep class io.github.proify.lyricon.localprovider.xposed.PowerAmp
 
-# 保留 YukiHookAPI 及其依赖
--keep class com.highcapable.yukihookapi.** { *; }
--keep class com.highcapable.kavaref.** { *; }
+# libxposed R8 支持
+-dontwarn io.github.libxposed.annotation.**
+-adaptresourcefilecontents META-INF/xposed/java_init.list
+-keep,allowoptimization,allowobfuscation public class * extends io.github.libxposed.api.XposedModule {
+    public <init>();
+}
 
 # 保留 TagLib（内嵌歌词需要）
 -keep class com.kyant.taglib.** { *; }
@@ -21,21 +25,6 @@
 -keep class kotlinx.serialization.** { *; }
 -keepclassmembers class * {
     @kotlinx.serialization.Serializable <fields>;
-}
-
-# 移除所有 Log 调用（减小体积）
--assumenosideeffects class android.util.Log {
-    public static boolean isLoggable(java.lang.String, int);
-    public static int v(...);
-    public static int i(...);
-    public static int w(...);
-    public static int d(...);
-    public static int e(...);
-}
-
-# 移除 Kotlin 内联检查（可选）
--assumenosideeffects class kotlin.jvm.internal.Intrinsics {
-    static void checkParameterIsNotNull(java.lang.Object, java.lang.String);
 }
 
 # 忽略警告（如反射相关）

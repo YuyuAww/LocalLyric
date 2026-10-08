@@ -6,28 +6,25 @@
 
 package io.github.proify.lyricon.localprovider.xposed
 
-import com.highcapable.yukihookapi.YukiHookAPI
-import com.highcapable.yukihookapi.annotation.xposed.InjectYukiHookWithXposed
-import com.highcapable.yukihookapi.hook.xposed.proxy.IYukiHookXposedInit
+import android.util.Log
+import io.github.libxposed.api.XposedModule
+import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
+import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 
-@InjectYukiHookWithXposed(modulePackageName = "io.github.proify.lyricon.localprovider")
-open class HookEntry : IYukiHookXposedInit {
+class HookEntry : XposedModule() {
+    private var processName: String = ""
 
-    override fun onHook() {
-        YukiHookAPI.encase {
-            // 原有 LocalProvider（支持 MediaSession 的通用播放器）
-            loadApp(isExcludeSelf = true, LocalProvider)
-            // 新增 PowerAmp 专用 Hooker（支持 PowerAmp 广播和内嵌歌词）
-            loadApp("com.maxmpz.audioplayer", PowerAmp)
-        }
+    override fun onModuleLoaded(param: ModuleLoadedParam) {
+        processName = param.processName
+        log(Log.DEBUG, "LocalProvider", "========== 模块已加载，进程名=$processName ==========")
     }
 
-    override fun onInit() {
-        YukiHookAPI.configs {
-            debugLog {
-                isEnable = true
-                tag = "LocalProvider"
-            }
+    override fun onPackageReady(param: PackageReadyParam) {
+        val packageName = param.packageName
+        if (packageName == "com.maxmpz.audioplayer") {
+            PowerAmp.setup(this, param.classLoader, packageName, processName)
+        } else {
+            LocalProvider.setup(this, param.classLoader, packageName, processName)
         }
     }
 }

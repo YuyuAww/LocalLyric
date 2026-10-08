@@ -13,7 +13,6 @@ pluginManagement {
         maven { url = uri("https://jitpack.io") }
         google()
         gradlePluginPortal()
-        maven { url = uri("https://api.xposed.info/") }
     }
 }
 plugins {
@@ -27,7 +26,6 @@ dependencyResolutionManagement {
         mavenCentral()
         maven { url = uri("https://jitpack.io") }
         google()
-        maven { url = uri("https://api.xposed.info/") }
     }
 }
 
