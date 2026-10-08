@@ -36,7 +36,7 @@ object LocalProvider : DownloadCallback {
 
     private var xposed: XposedInterface? = null
     private var classLoader: ClassLoader? = null
-    private var appContext: Context? = null
+    var appContext: Context? = null
     private var processName: String = ""
     private var isSetup = false
 
@@ -63,17 +63,19 @@ object LocalProvider : DownloadCallback {
 
         val onCreate = activityClass.getDeclaredMethod("onCreate", Bundle::class.java)
         x.hook(onCreate).intercept { chain ->
+            val result = chain.proceed()
             val activity = chain.thisObject as? Activity
             appContext = activity?.applicationContext
-            chain.proceed()
             initProvider()
             hookMediaSession()
+            result
         }
 
         val onTerminate = activityClass.getDeclaredMethod("onTerminate")
         x.hook(onTerminate).intercept { chain ->
-            chain.proceed()
+            val result = chain.proceed()
             release()
+            result
         }
     }
 
@@ -133,16 +135,22 @@ object LocalProvider : DownloadCallback {
 
         val setPlaybackState = mediaSessionClass.getDeclaredMethod("setPlaybackState", PlaybackState::class.java)
         x.hook(setPlaybackState).intercept { chain ->
-            chain.proceed()
-            val state = chain.args[0] as? PlaybackState ?: return@intercept
-            provider?.player?.setPlaybackState(state)
+            val result = chain.proceed()
+            val state = chain.args[0] as? PlaybackState
+            if (state != null) {
+                provider?.player?.setPlaybackState(state)
+            }
+            result
         }
 
         val setMetadata = mediaSessionClass.getDeclaredMethod("setMetadata", MediaMetadata::class.java)
         x.hook(setMetadata).intercept { chain ->
-            chain.proceed()
-            val metadata = chain.args[0] as? MediaMetadata ?: return@intercept
-            handleMetadata(metadata)
+            val result = chain.proceed()
+            val metadata = chain.args[0] as? MediaMetadata
+            if (metadata != null) {
+                handleMetadata(metadata)
+            }
+            result
         }
     }
 

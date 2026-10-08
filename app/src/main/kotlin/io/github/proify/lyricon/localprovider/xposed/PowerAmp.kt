@@ -35,7 +35,7 @@ object PowerAmp {
 
     private var xosed: XposedInterface? = null
     private var classLoader: ClassLoader? = null
-    private var appContext: Context? = null
+    var appContext: Context? = null
     private var processName: String = ""
     private var isSetup = false
 
@@ -61,20 +61,22 @@ object PowerAmp {
 
         val onCreate = activityClass.getDeclaredMethod("onCreate", Bundle::class.java)
         x.hook(onCreate).intercept { chain ->
+            val result = chain.proceed()
             val activity = chain.thisObject as? Activity
             appContext = activity?.applicationContext
-            chain.proceed()
             appContext?.let { ctx ->
                 initLyriconProvider(ctx)
                 setupBroadcastReceiver(ctx)
             }
             hookMediaSession()
+            result
         }
 
         val onTerminate = activityClass.getDeclaredMethod("onTerminate")
         x.hook(onTerminate).intercept { chain ->
-            chain.proceed()
+            val result = chain.proceed()
             release()
+            result
         }
     }
 
@@ -131,9 +133,12 @@ object PowerAmp {
         val mediaSessionClass = Class.forName("android.media.session.MediaSession", false, cl)
         val setPlaybackState = mediaSessionClass.getDeclaredMethod("setPlaybackState", PlaybackState::class.java)
         x.hook(setPlaybackState).intercept { chain ->
-            chain.proceed()
-            val state = chain.args[0] as? PlaybackState ?: return@intercept
-            provider?.player?.setPlaybackState(state)
+            val result = chain.proceed()
+            val state = chain.args[0] as? PlaybackState
+            if (state != null) {
+                provider?.player?.setPlaybackState(state)
+            }
+            result
         }
         xosed?.log(Log.INFO, TAG, "MediaSession hooked")
     }

@@ -61,14 +61,16 @@ object Flyme {
             val spClass = Class.forName("android.os.SystemProperties", false, loader)
             val getOneArg = spClass.getDeclaredMethod("get", String::class.java)
             hookHandles += xosed.hook(getOneArg).intercept { chain ->
+                val result = chain.proceed()
                 val key = chain.args[0] as? String
-                spoofMap[key] ?: chain.proceed()
+                spoofMap[key] ?: result
             }
 
             val getTwoArg = spClass.getDeclaredMethod("get", String::class.java, String::class.java)
             hookHandles += xosed.hook(getTwoArg).intercept { chain ->
+                val result = chain.proceed()
                 val key = chain.args[0] as? String
-                spoofMap[key] ?: chain.proceed()
+                spoofMap[key] ?: result
             }
 
             val getField = Class::class.java.getDeclaredMethod("getField", String::class.java)
