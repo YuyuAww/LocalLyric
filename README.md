@@ -24,11 +24,11 @@ LyricProvider/
 │       │       ├── local/        # 外部 LRC 文件解析
 │       │       ├── util/         # 工具类
 │       │       └── model/        # 数据模型
-│       ├── assets/
-│       │   └── xposed_init       # Xposed 入口类声明
 │       ├── resources/
 │       │   └── META-INF/
-│       │       └── yukihookapi_init  # YukiHookAPI 初始化
+│       │       └── xposed/
+│       │           ├── java_init.list  # Xposed 入口类声明（libxposed）
+│       │           └── module.prop      # 模块属性（minApiVersion=102）
 │       └── AndroidManifest.xml
 ├── share/
 │   ├── lrckit/                   # 歌词解析共享模块
@@ -42,7 +42,7 @@ LyricProvider/
 - **开发语言**: Kotlin
 - **构建工具**: Gradle 9.x (Kotlin DSL)
 - **核心框架**:
-  - YukiHookAPI：Xposed Hook 框架
+  - libxposed API：Xposed Hook 框架（`compileOnly`，由运行环境提供）
   - Lyricon Provider API：歌词提供者接口
   - TagLib：音频元数据读取库
 - **最低 API**: 27 (Android 8.1)
@@ -59,7 +59,7 @@ LyricProvider/
 
 | 类名 | 职责 | 关键方法 |
 |------|------|----------|
-| **HookEntry** | Xposed 模块入口 | `onHook()`：加载 LocalProvider 和 PowerAmp Hooker<br>`onInit()`：配置调试日志 |
+| **HookEntry** | Xposed 模块入口（libxposed） | `onModuleLoaded()`：记录注入进程名<br>`onPackageReady()`：按包名分发到 PowerAmp / LocalProvider |
 | **LocalProvider** | 通用播放器适配（支持 MediaSession） | `hookMediaSession()`：Hook MediaSession API<br>`handleMetadata()`：处理歌曲元数据变更<br>`tryLoadEmbeddedLyrics()`：读取内嵌歌词 |
 | **PowerAmp** | PowerAmp 播放器专用适配 | `handleTrackChange()`：处理 PowerAmp 广播事件<br>`fetchEmbeddedLyrics()`：读取内嵌歌词<br>`hookMediaSession()`：同步播放状态 |
 | **DownloadManager** | 歌词搜索任务管理器 | `search()`：启动歌词搜索流程<br>`cancel()`：取消当前任务 |
@@ -287,23 +287,19 @@ dependencies {
 
     // 核心框架
     implementation(libs.lyricon.provider)       // Lyricon 歌词框架
-    implementation(libs.yukihookapi.api)        // Xposed Hook 框架
-    ksp(libs.yukihookapi.ksp.xposed)           // KSP 处理器
 
     // 音频处理
     implementation(libs.taglib)                 // 音频元数据读取
 
-    // 反射与序列化
-    implementation(libs.kavaref.core)           // Kotlin 反射工具
-    implementation(libs.kavaref.extension)
+    // 序列化
     implementation(libs.kotlinx.serialization.json)
 
     // AndroidX
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
 
-    // Xposed API（编译时）
-    compileOnly(libs.xposed.api)
+    // Xposed API（编译时，由 libxposed 运行环境提供）
+    compileOnly(libs.libxposed.api)
 }
 ```
 
@@ -316,7 +312,7 @@ app (主模块)
  ├─→ share:extensions-android (Android 扩展)
  │        └─→ share:extensions-kt (api 依赖)
  ├─→ lyricon.provider (歌词提供者接口)
- ├─→ yukihookapi (Hook 框架)
+ ├─→ libxposed.api (Hook 框架，compileOnly)
  └─→ taglib (音频标签读取)
 ```
 
@@ -328,7 +324,6 @@ repositories {
     mavenCentral()
     maven { url = uri("https://jitpack.io") }       // JitPack 仓库
     google()                                        // Google 仓库
-    maven { url = uri("https://api.xposed.info/") } // Xposed API
 }
 ```
 
@@ -386,8 +381,9 @@ repositories {
 ### Xposed 模块使用
 
 1. **激活模块**
-   - 在 Xposed Installer / LSPosed 中激活本模块
+   - 需在 libxposed 兼容的运行环境中使用（`module.prop` 要求 `minApiVersion=102`，与 `AndroidManifest.xml` 的 `xposedminversion=102` 一致）
    - 设置作用域：选择目标音乐播放器或设置为"系统框架"（全局）
+   - 模块支持 `autoHotReload=true` 热重载，异常保护模式（`exceptionMode=protective`）
 
 2. **默认作用域**
    - 通用播放器：支持 MediaSession API 的播放器（如 Musicolet、Omnia Music Player）
@@ -419,7 +415,7 @@ repositories {
 项目配置了 GitHub Actions 自动构建工作流（`.github/workflows/build-release.yml`）：
 
 - **触发条件**：push 到 main、pull request、手动触发
-- **构建流程**：检出代码 → 配置 JDK 17 → 构建 Release APK → 上传 Artifact
+- **构建流程**：检出代码 → 配置 JDK 17 → `./gradlew assembleRelease` → 上传 Artifact（`release-apk`，来源 `app/build/outputs/apk/release/app-release.apk`）
 - **产物保留**：30 天
 
 ### 歌词文件格式支持
@@ -473,7 +469,15 @@ repositories {
 - SAF 路径解析：适配 PowerAmp 的特殊文件路径格式
 - 独立 Provider 注册：避免与通用 Hooker 冲突
 
-### 5. 配置缓存兼容
+### 5. R8 混淆与资源压缩
+
+Release 构建启用 R8 混淆（`isMinifyEnabled`）和资源压缩（`isShrinkResources`），混淆规则见 `app/proguard-rules.pro`：
+
+- 保留 Xposed 入口 `HookEntry` 及 `LocalProvider`、`PowerAmp`
+- libxposed R8 支持：`-adaptresourcefilecontents META-INF/xposed/java_init.list`，并对继承 `XposedModule` 的类保留可优化/可混淆成员
+- 保留 TagLib（内嵌歌词反射调用）与 kotlinx.serialization 相关类
+
+### 6. 配置缓存兼容
 
 所有构建脚本遵循 Gradle 配置缓存要求：
 - 外部进程（如 keytool）在执行阶段通过 Task 调用
